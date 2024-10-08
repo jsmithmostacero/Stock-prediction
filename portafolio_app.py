@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-#import pandas_datareader.data as web
 import yfinance as yf  # Importa yfinance
 import datetime
 from PIL import Image
@@ -12,6 +11,7 @@ from prophet import Prophet
 
 
 plt.style.use("dark_background")
+
 ###########################
 #### Funciones Principales
 ###########################
@@ -23,19 +23,17 @@ def get_data(stock, start_time, end_time):
 
 def get_levels(dfvar):
         
-
     def isSupport(df,i):
-        support = df['low'][i] < df['low'][i-1]  and df['low'][i] < df['low'][i+1] and df['low'][i+1] < df['low'][i+2] and df['low'][i-1] < df['low'][i-2]
+        support = df['low'].iloc[i] < df['low'].iloc[i-1]  and df['low'].iloc[i] < df['low'].iloc[i+1] and df['low'].iloc[i+1] < df['low'].iloc[i+2] and df['low'].iloc[i-1] < df['low'].iloc[i-2]
         return support
 
     def isResistance(df,i):
-        resistance = df['high'][i] > df['high'][i-1]  and df['high'][i] > df['high'][i+1] and df['high'][i+1] > df['high'][i+2] and df['high'][i-1] > df['high'][i-2]
+        resistance = df['high'].iloc[i] > df['high'].iloc[i-1]  and df['high'].iloc[i] > df['high'].iloc[i+1] and df['high'].iloc[i+1] > df['high'].iloc[i+2] and df['high'].iloc[i-1] > df['high'].iloc[i-2]
         return resistance
 
     def isFarFromLevel(l, levels, s):
         level = np.sum([abs(l-x[0]) < s  for x in levels])
         return  level == 0
-    
     
     df = dfvar.copy()
     df.rename(columns={'High':'high','Low':'low'}, inplace=True)
@@ -43,25 +41,24 @@ def get_levels(dfvar):
     levels = []
     for i in range(2,df.shape[0]-2):
         if isSupport(df,i):  
-            levels.append((i,df['low'][i]))
+            levels.append((i,df['low'].iloc[i]))
         elif isResistance(df,i):
-            levels.append((i,df['high'][i]))
+            levels.append((i,df['high'].iloc[i]))
 
     filter_levels = []
     for i in range(2,df.shape[0]-2):
         if isSupport(df,i):
-            l = df['low'][i]
+            l = df['low'].iloc[i]
             if isFarFromLevel(l, levels, s):
                 filter_levels.append((i,l))
         elif isResistance(df,i):
-            l = df['high'][i]
+            l = df['high'].iloc[i]
             if isFarFromLevel(l, levels, s):
                 filter_levels.append((i,l))
 
     return filter_levels
 
 def plot_close_price(data):
-
 
     levels = get_levels(data)
     df_levels = pd.DataFrame(levels, columns=['index','close'])
@@ -70,7 +67,6 @@ def plot_close_price(data):
     min_level = df_levels.idxmin()
 
     ratios = [0,0.236, 0.382, 0.5 , 0.618, 0.786,1]
-
 
     if min_level.close > max_level.close:
         trend = 'down'
@@ -81,7 +77,6 @@ def plot_close_price(data):
         fib_levels = [data.Close.iloc[min_level.close] + (data.Close.iloc[max_level.close] - data.Close.iloc[min_level.close]) * ratio for ratio in ratios]
         idx_level = min_level
 
-    
     background = plt.imread('assets/logo_source.png')
     logo = plt.imread('assets/pypro_logo_plot.png')
     font = {'family': 'sans-serif',
@@ -96,7 +91,6 @@ def plot_close_price(data):
         'size': 10,
         }
 
-
     fig = plt.figure(figsize=(10,6))
     plt.plot(data.index, data.Close, color='dodgerblue', linewidth=1)
     mplcyberpunk.add_glow_effects()
@@ -106,7 +100,6 @@ def plot_close_price(data):
     plt.ylabel('Precio USD')
     plt.xticks(rotation=45,  ha='right')
     ax = plt.gca()
-    #ax.figure.figimage(logo,  10, 1000, alpha=.99, zorder=1)
     ax.figure.figimage(background, 40, 40, alpha=.15, zorder=1)
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
@@ -138,7 +131,6 @@ def plot_volatility(df_vol):
             'size': 10,
             }
 
-
     df_plot = df_vol.copy()
     fig = plt.figure(figsize=(10,6))
     plt.plot(df_plot.index, df_plot.returns, color='dodgerblue', linewidth=0.5)
@@ -148,7 +140,6 @@ def plot_volatility(df_vol):
     plt.xticks(rotation=45,  ha='right')
     ax = plt.gca()
     ax.yaxis.set_major_formatter(mpl.ticker.StrMethodFormatter('{x:,.3f}'))
-    #ax.figure.figimage(logo,  10, 1000, alpha=.99, zorder=1)
     ax.figure.figimage(background, 40, 40, alpha=.15, zorder=1)
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
@@ -158,7 +149,7 @@ def plot_volatility(df_vol):
     return fig
 
 
-def plot_prophet(data, n_forecast=365):
+def plot_prophet(data, n_forecast=100):  # Reducido a 100 periodos
     data_prophet = data.reset_index().copy()
     data_prophet.rename(columns={'Date':'ds','Close':'y'}, inplace=True)
 
@@ -196,7 +187,7 @@ with st.sidebar:
     end_time = st.date_input(
                     "Fecha Final",
                     datetime.date(2022, 10, 6))
-    periods = st.number_input('Periodos Forecast', value=365, min_value=1, max_value=5000)
+    periods = st.number_input('Periodos Forecast', value=100, min_value=1, max_value=5000)  # Ajustado a 100 periodos
 
 
 ###########################
@@ -211,7 +202,6 @@ df_vol = returns_vol(df_ret)
 plot_vol = plot_volatility(df_vol)
 
 plot_forecast = plot_prophet(data, periods)
-
 
 
 ###########################
@@ -230,6 +220,3 @@ st.subheader('Retornos Diarios')
 st.pyplot(plot_vol)
 
 st.dataframe(data)
-
-
-
